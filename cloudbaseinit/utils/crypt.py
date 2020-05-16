@@ -21,7 +21,7 @@ import sys
 if sys.platform == "win32":
     openssl_lib_path = "libeay32.dll"
 else:
-    openssl_lib_path = ctypes.util.find_library("ssl")
+    openssl_lib_path = "/usr/local/lib/libssl.so"
 
 openssl = ctypes.CDLL(openssl_lib_path)
 clib = ctypes.CDLL(ctypes.util.find_library("c"))
