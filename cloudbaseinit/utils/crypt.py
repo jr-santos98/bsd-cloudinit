@@ -18,13 +18,24 @@ import ctypes.util
 import struct
 import sys
 
-if sys.platform == "win32":
-    openssl_lib_path = "libeay32.dll"
-else:
-    openssl_lib_path = "/usr/local/lib/libssl.so"
+clib_path = ctypes.util.find_library("c")
 
-openssl = ctypes.CDLL(openssl_lib_path)
-clib = ctypes.CDLL(ctypes.util.find_library("c"))
+if sys.platform == "win32":
+    if clib_path:
+        clib = ctypes.CDLL(clib_path)
+    else:
+        clib = ctypes.cdll.ucrtbase
+
+    # Note(mbivolan): The library name has changed in OpenSSL 1.1.0
+    # Keeping the old name for backward compatibility
+    try:
+        openssl = ctypes.cdll.libeay32
+    except Exception:
+        openssl = ctypes.cdll.libcrypto
+else:
+    clib = ctypes.CDLL(clib_path)
+    openssl_lib_path = ctypes.util.find_library("ssl")
+    openssl = ctypes.CDLL(openssl_lib_path)
 
 
 class RSA(ctypes.Structure):
@@ -86,8 +97,13 @@ openssl.ERR_error_string_n.argtypes = [ctypes.c_long,
                                        ctypes.c_char_p,
                                        ctypes.c_int]
 
-openssl.ERR_load_crypto_strings.restype = ctypes.c_int
-openssl.ERR_load_crypto_strings.argtypes = []
+try:
+    openssl.ERR_load_crypto_strings.restype = ctypes.c_int
+    openssl.ERR_load_crypto_strings.argtypes = []
+except AttributeError:
+    # NOTE(avladu): This function is deprecated and no longer needed
+    # since OpenSSL 1.1
+    pass
 
 clib.fopen.restype = ctypes.c_void_p
 clib.fopen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
@@ -107,7 +123,11 @@ class OpenSSLException(CryptException):
         super(OpenSSLException, self).__init__(message)
 
     def _get_openssl_error_msg(self):
-        openssl.ERR_load_crypto_strings()
+        try:
+            openssl.ERR_load_crypto_strings()
+        except AttributeError:
+            pass
+
         errno = openssl.ERR_get_error()
         errbuf = ctypes.create_string_buffer(1024)
         openssl.ERR_error_string_n(errno, errbuf, 1024)
