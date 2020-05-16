@@ -1,6 +1,5 @@
 pbr>=0.10
 iso8601
-eventlet
 netaddr>=0.7.6
 pyserial
 oslo.config==1.15.0
